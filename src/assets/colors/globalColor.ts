@@ -1,13 +1,21 @@
 export const color = {
-  primary: '#1E3A8A',
-  secondary: '#3B82F6',
-  accent: '#10B981',
-  background: '#F3F4F6',
+  // Theme colors derived from INTELLECT logo
+  primaryGold: '#A88200',      // Main mustard gold from logo
+  primaryDarkGold: '#856700',  // Darker gold for buttons/active states
+  primaryLightGold: '#FFF9E6', // Light tint for backgrounds/cards
+  accentRed: '#E60000',        // Red 4-star icon accent
+  accentRedDark: '#B30000',
+
+  // Neutrals
+  background: '#F8F9FA',
   surface: '#FFFFFF',
-  textPrimary: '#1F2937',
+  textPrimary: '#111827',
   textSecondary: '#6B7280',
   border: '#E5E7EB',
-  error: '#EF4444',
+  inputBg: '#F9FAFB',
+
+  // Status
   success: '#10B981',
+  error: '#EF4444',
   warning: '#F59E0B',
 };
