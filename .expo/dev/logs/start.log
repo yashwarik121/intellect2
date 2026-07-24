@@ -1,0 +1,30 @@
+{"_e":"root:init","_t":1784875860982,"format":"v0-jsonl","version":"57.0.10"}
+{"_e":"env:mode","_t":1784875860983,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1784875860988,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1784875861290,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1784875861913,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1784875862520,"plugins":[]}
+{"_e":"metro:instantiate","_t":1784875870055,"atlas":false,"workers":3,"host":"::","port":8081}
+{"_e":"root:init","_t":1784875879551,"format":"v0-jsonl","version":"57.0.10"}
+{"_e":"env:mode","_t":1784875879553,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1784875879556,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1784875879827,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1784875880240,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1784875880716,"plugins":[]}
+{"_e":"metro:instantiate","_t":1784875886229,"atlas":false,"workers":3,"host":"::","port":8081}
+{"_e":"root:init","_t":1784877981661,"format":"v0-jsonl","version":"57.0.10"}
+{"_e":"env:mode","_t":1784877981665,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1784877981687,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1784877982201,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1784877983245,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1784877984265,"plugins":[]}
+{"_e":"metro:instantiate","_t":1784877990891,"atlas":false,"workers":3,"host":"::","port":8081}
+{"_e":"root:init","_t":1784878040978,"format":"v0-jsonl","version":"57.0.10"}
+{"_e":"env:mode","_t":1784878040979,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1784878040983,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1784878041919,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1784878042929,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1784878043737,"plugins":[]}
+{"_e":"metro:instantiate","_t":1784878050484,"atlas":false,"workers":3,"host":"::","port":8081}
+{"_e":"metro:client_log","_t":1784878133064,"level":"error","data":["Project is incompatible with this version of Expo Go\n\nThis project requires a newer version of Expo Go.\n\nHow to fix this error:\nDownload the latest version of Expo Go from the Play Store."]}
+{"_e":"metro:client_log","_t":1784878158009,"level":"error","data":["Project is incompatible with this version of Expo Go\n\nThis project requires a newer version of Expo Go.\n\nHow to fix this error:\nDownload the latest version of Expo Go from the Play Store."]}

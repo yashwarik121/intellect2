@@ -1,4 +1,12 @@
 {
-  "name": "EmployeePortal",
-  "displayName": "Employee Portal"
+  "expo": {
+    "name": "Employee Portal",
+    "slug": "employee-portal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ]
+  }
 }

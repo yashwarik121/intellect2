@@ -5,13 +5,15 @@
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
-    "start": "react-native start",
+    "start": "npx expo start",
+    "expo:start": "npx expo start",
     "test": "jest",
     "lint": "eslint ."
   },
   "dependencies": {
+    "expo": "~51.0.0",
     "react": "18.2.0",
-    "react-native": "0.72.6"
+    "react-native": "0.74.5"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
