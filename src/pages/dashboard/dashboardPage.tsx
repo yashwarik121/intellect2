@@ -1,16 +1,26 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { IntellectLogo } from '../../components/common/IntellectLogo';
 import { CustomButton } from '../../components/common/CustomButton';
 import { color } from '../../assets/colors/globalColor';
 import { storageService, RegisteredUser } from '../../services/storageService';
+
+// Import action screens
+import AttendanceHomePage from '../attendance/attendanceHomePage';
+import ApplyLeavePage from '../leave/applyLeavePage';
+import PaystubListPage from '../payroll/paystubListPage';
+import AnnouncementsPage from '../announcements/announcementsPage';
 
 interface DashboardPageProps {
   user?: RegisteredUser | null;
   onLogout: () => void;
 }
 
+type ActiveModal = 'NONE' | 'ATTENDANCE' | 'LEAVE' | 'PAYSTUBS' | 'ANNOUNCEMENTS';
+
 export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
+  const [activeModal, setActiveModal] = useState<ActiveModal>('NONE');
+
   const handleLogoutPress = async () => {
     await storageService.clearSessionUser();
     onLogout();
@@ -61,36 +71,52 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
         <Text style={styles.sectionHeader}>Quick Employee Actions</Text>
 
         <View style={styles.gridContainer}>
-          <TouchableOpacity style={styles.actionCard}>
+          {/* 1. Attendance */}
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => setActiveModal('ATTENDANCE')}
+          >
             <View style={[styles.iconCircle, { backgroundColor: '#FEF3C7' }]}>
               <Text style={{ fontSize: 22 }}>⏱️</Text>
             </View>
             <Text style={styles.cardTitle}>Attendance</Text>
-            <Text style={styles.cardSub}>Clock in/out & history</Text>
+            <Text style={styles.cardSub}>Clock in/out & calendar sheet</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard}>
+          {/* 2. Leave Request */}
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => setActiveModal('LEAVE')}
+          >
             <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>
               <Text style={{ fontSize: 22 }}>📅</Text>
             </View>
             <Text style={styles.cardTitle}>Leave Request</Text>
-            <Text style={styles.cardSub}>Apply & track balance</Text>
+            <Text style={styles.cardSub}>Apply for approval</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard}>
+          {/* 3. Paystubs */}
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => setActiveModal('PAYSTUBS')}
+          >
             <View style={[styles.iconCircle, { backgroundColor: '#E0E7FF' }]}>
               <Text style={{ fontSize: 22 }}>💵</Text>
             </View>
             <Text style={styles.cardTitle}>Paystubs</Text>
-            <Text style={styles.cardSub}>View salary slips</Text>
+            <Text style={styles.cardSub}>View ₹40,000 monthly slips</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard}>
+          {/* 4. Announcements */}
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => setActiveModal('ANNOUNCEMENTS')}
+          >
             <View style={[styles.iconCircle, { backgroundColor: '#D1FAE5' }]}>
               <Text style={{ fontSize: 22 }}>📢</Text>
             </View>
             <Text style={styles.cardTitle}>Announcements</Text>
-            <Text style={styles.cardSub}>Company updates</Text>
+            <Text style={styles.cardSub}>View company notices</Text>
           </TouchableOpacity>
         </View>
 
@@ -102,6 +128,23 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
           style={{ marginTop: 24 }}
         />
       </ScrollView>
+
+      {/* --- FEATURE MODALS --- */}
+      <Modal visible={activeModal === 'ATTENDANCE'} animationType="slide">
+        <AttendanceHomePage onClose={() => setActiveModal('NONE')} />
+      </Modal>
+
+      <Modal visible={activeModal === 'LEAVE'} animationType="slide">
+        <ApplyLeavePage onClose={() => setActiveModal('NONE')} />
+      </Modal>
+
+      <Modal visible={activeModal === 'PAYSTUBS'} animationType="slide">
+        <PaystubListPage onClose={() => setActiveModal('NONE')} />
+      </Modal>
+
+      <Modal visible={activeModal === 'ANNOUNCEMENTS'} animationType="slide">
+        <AnnouncementsPage onClose={() => setActiveModal('NONE')} />
+      </Modal>
     </View>
   );
 }
@@ -228,7 +271,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    justifyContent: 'center',
+    justify.content: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },

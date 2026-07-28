@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -36,12 +35,30 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   // UI status message
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Email helper validator
+  const isValidEmail = (email: string) => {
+    return email.includes('@') && email.includes('.') && email.indexOf('@') > 0 && email.lastIndexOf('.') > email.indexOf('@');
+  };
+
   const handleRegister = async () => {
     setMessage(null);
     if (!regEmpId.trim() || !regFullName.trim() || !regEmail.trim() || !regPassword) {
       setMessage({ type: 'error', text: 'Please fill in all required fields.' });
       return;
     }
+
+    // Email validation
+    if (!isValidEmail(regEmail.trim())) {
+      setMessage({ type: 'error', text: 'Please enter a valid email address containing "@" (e.g. name@company.com).' });
+      return;
+    }
+
+    // Password validation (min 6 characters)
+    if (regPassword.length < 6) {
+      setMessage({ type: 'error', text: 'Password must be at least 6 characters long.' });
+      return;
+    }
+
     if (regPassword !== regConfirmPassword) {
       setMessage({ type: 'error', text: 'Passwords do not match.' });
       return;
@@ -73,7 +90,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       setRegEmail('');
       setRegPassword('');
       setRegConfirmPassword('');
-      setIsLoginTab(true); // Switch to login tab
+      setIsLoginTab(true);
     } else {
       setMessage({ type: 'error', text: 'Registration failed. Please try again.' });
     }
@@ -83,6 +100,11 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     setMessage(null);
     if (!loginEmpId.trim() || !loginPassword) {
       setMessage({ type: 'error', text: 'Please enter your Employee ID and Password.' });
+      return;
+    }
+
+    if (loginPassword.length < 6) {
+      setMessage({ type: 'error', text: 'Password must be at least 6 characters long.' });
       return;
     }
 
@@ -100,7 +122,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       return;
     }
 
-    // Login success! Set session
+    // Login success
     await storageService.setSessionUser(user);
     onLoginSuccess(user);
   };
@@ -157,7 +179,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
           </View>
         )}
 
-        {/* Card Container for Forms */}
+        {/* Form Container */}
         <View style={styles.card}>
           {isLoginTab ? (
             // --- LOGIN FORM ---
@@ -173,7 +195,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 autoCapitalize="characters"
               />
               <CustomInput
-                label="Password"
+                label="Password (min 6 chars)"
                 placeholder="Enter your password"
                 value={loginPassword}
                 onChangeText={setLoginPassword}
@@ -207,15 +229,15 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 autoCapitalize="words"
               />
               <CustomInput
-                label="Corporate Email"
+                label="Corporate Email (must contain '@')"
                 placeholder="e.g. john@intellect.com"
                 value={regEmail}
                 onChangeText={setRegEmail}
                 keyboardType="email-address"
               />
               <CustomInput
-                label="Password"
-                placeholder="Create password"
+                label="Password (min 6 chars)"
+                placeholder="Create password (6+ chars)"
                 value={regPassword}
                 onChangeText={setRegPassword}
                 secureTextEntry
