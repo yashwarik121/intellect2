@@ -1,4 +1,4 @@
-import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RegisteredUser } from './storageService';
 
@@ -7,10 +7,14 @@ const ASYNC_USERS_KEY = '@intellect_all_users_backup';
 
 let db: any = null;
 
-// Helper to check if native SQLite is available (Native vs Web)
+// Dynamically import SQLite only on Native Android / iOS platforms to prevent Web .wasm bundler errors
 const getDb = async () => {
+  if (Platform.OS === 'web') {
+    return null; // On web, use AsyncStorage seamlessly
+  }
   if (!db) {
     try {
+      const SQLite = require('expo-sqlite');
       if (SQLite && typeof SQLite.openDatabaseAsync === 'function') {
         db = await SQLite.openDatabaseAsync(DB_NAME);
       }
@@ -81,7 +85,7 @@ export const databaseService = {
         }
       }
 
-      // Fallback to AsyncStorage
+      // Fallback / Web: AsyncStorage
       const str = await AsyncStorage.getItem(ASYNC_USERS_KEY);
       return str ? JSON.parse(str) : [];
     } catch (e) {
@@ -128,7 +132,7 @@ export const databaseService = {
         );
       }
 
-      // Sync with AsyncStorage backup
+      // Sync with AsyncStorage
       const allUsers = await databaseService.getAllUsers();
       const existingIdx = allUsers.findIndex((u) => u.employeeId === newUser.employeeId);
       if (existingIdx >= 0) {
@@ -140,7 +144,21 @@ export const databaseService = {
       return true;
     } catch (e) {
       console.error('[DatabaseService] addUser error:', e);
-      return false;
+      // Ensure AsyncStorage fallback works even if DB throws
+      try {
+        const str = await AsyncStorage.getItem(ASYNC_USERS_KEY);
+        const allUsers: RegisteredUser[] = str ? JSON.parse(str) : [];
+        const existingIdx = allUsers.findIndex((u) => u.employeeId === newUser.employeeId);
+        if (existingIdx >= 0) {
+          allUsers[existingIdx] = newUser;
+        } else {
+          allUsers.unshift(newUser);
+        }
+        await AsyncStorage.setItem(ASYNC_USERS_KEY, JSON.stringify(allUsers));
+        return true;
+      } catch (err) {
+        return false;
+      }
     }
   },
 
