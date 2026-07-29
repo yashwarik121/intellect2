@@ -10,9 +10,9 @@ import {
   TextInput,
 } from 'react-native';
 import { CustomInput } from '../../components/common/CustomInput';
-import { CustomButton } from '../../components/common/CustomButton';
 import { color } from '../../assets/colors/globalColor';
 import { storageService, RegisteredUser } from '../../services/storageService';
+import { databaseService } from '../../services/databaseService';
 
 interface AdminUsersPageProps {
   onClose: () => void;
@@ -25,9 +25,11 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Modal for Add / Edit
+  // Modal states
   const [showFormModal, setShowFormModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showCSVModal, setShowCSVModal] = useState(false);
+  const [csvText, setCsvText] = useState('');
 
   // Form Fields
   const [formEmpId, setFormEmpId] = useState('');
@@ -72,6 +74,12 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
     setShowFormModal(true);
   };
 
+  const handleViewCSV = async () => {
+    const rawCsv = await databaseService.getUsersCSVString();
+    setCsvText(rawCsv);
+    setShowCSVModal(true);
+  };
+
   const handleSaveUser = async () => {
     if (!formEmpId.trim() || !formFullName.trim() || !formEmail.trim() || !formPassword.trim()) {
       Alert.alert('Validation Error', 'Please fill in all user fields.');
@@ -96,14 +104,13 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
       await storageService.updateUser(userData);
       Alert.alert('Success', `User ${userData.employeeId} updated successfully.`);
     } else {
-      // Check if already exists
       const existing = await storageService.getUserByEmployeeId(userData.employeeId);
       if (existing) {
         Alert.alert('Error', `Employee ID ${userData.employeeId} already exists!`);
         return;
       }
       await storageService.registerUser(userData);
-      Alert.alert('Success', `User ${userData.employeeId} added to SQLite database.`);
+      Alert.alert('Success', `User ${userData.employeeId} registered and saved to CSV.`);
     }
 
     setShowFormModal(false);
@@ -114,7 +121,7 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
   const handleDeleteUser = (empId: string) => {
     Alert.alert(
       'Confirm Delete',
-      `Are you sure you want to delete user ${empId} from the database?`,
+      `Are you sure you want to delete user ${empId}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -142,7 +149,7 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text style={styles.headerIcon}>⚙️</Text>
-          <Text style={styles.headerTitle}>Admin Panel - SQLite Users</Text>
+          <Text style={styles.headerTitle}>Admin Users & CSV Database</Text>
         </View>
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
           <Text style={styles.closeButtonText}>✕ Close</Text>
@@ -150,7 +157,7 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
       </View>
 
       <View style={styles.contentArea}>
-        {/* Action Header: Search & Add Button */}
+        {/* Action Header: Search & Add / CSV Buttons */}
         <View style={styles.actionHeaderRow}>
           <TextInput
             style={styles.searchInput}
@@ -159,13 +166,17 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
             onChangeText={setSearchQuery}
             placeholderTextColor="#9CA3AF"
           />
+          <TouchableOpacity style={styles.csvButton} onPress={handleViewCSV}>
+            <Text style={styles.csvButtonText}>📄 View CSV</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.addButton} onPress={handleOpenAddModal}>
-            <Text style={styles.addButtonText}>+ Add User</Text>
+            <Text style={styles.addButtonText}>+ Add</Text>
           </TouchableOpacity>
         </View>
 
         <Text style={styles.countText}>
           Total Registered Users: <Text style={{ fontWeight: 'bold', color: color.primaryDarkGold }}>{users.length}</Text>
+          <Text style={{ fontStyle: 'italic', color: color.textSecondary }}> (Saved in src/data/registered_users.csv)</Text>
         </Text>
 
         {/* Users Table List */}
@@ -299,6 +310,36 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
           </View>
         </View>
       </Modal>
+
+      {/* --- CSV VIEWER MODAL --- */}
+      <Modal visible={showCSVModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '80%' }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={styles.modalTitle}>📄 Registered Users CSV File</Text>
+              <TouchableOpacity onPress={() => setShowCSVModal(false)}>
+                <Text style={{ fontSize: 18, color: color.textSecondary, fontWeight: 'bold' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={{ fontSize: 12, color: color.textSecondary, marginBottom: 8 }}>
+              File path: src/data/registered_users.csv
+            </Text>
+
+            <ScrollView style={{ backgroundColor: '#F9FAFB', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
+              <Text style={{ fontFamily: 'monospace', fontSize: 12, color: '#1F2937' }}>
+                {csvText}
+              </Text>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.saveModalBtn, { marginTop: 16, alignItems: 'center' }]}
+              onPress={() => setShowCSVModal(false)}
+            >
+              <Text style={styles.saveModalBtnText}>Close CSV Preview</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -323,7 +364,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
     color: color.textPrimary,
   },
@@ -353,25 +394,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
     color: color.textPrimary,
-    marginRight: 8,
+    marginRight: 6,
+  },
+  csvButton: {
+    backgroundColor: color.primaryLightGold,
+    borderWidth: 1,
+    borderColor: color.primaryGold,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    marginRight: 6,
+  },
+  csvButtonText: {
+    color: color.primaryDarkGold,
+    fontWeight: 'bold',
+    fontSize: 12,
   },
   addButton: {
     backgroundColor: color.primaryGold,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
     borderRadius: 10,
   },
   addButtonText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 13,
   },
   countText: {
-    fontSize: 13,
+    fontSize: 12,
     color: color.textSecondary,
     marginBottom: 12,
   },

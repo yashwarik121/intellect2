@@ -1,16 +1,17 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RegisteredUser } from './storageService';
+import { csvService } from './csvService';
 
 const DB_NAME = 'intellect_employee_portal.db';
 const ASYNC_USERS_KEY = '@intellect_all_users_backup';
+const ASYNC_CSV_KEY = '@intellect_all_users_csv';
 
 let db: any = null;
 
-// Dynamically import SQLite only on Native Android / iOS platforms to prevent Web .wasm bundler errors
 const getDb = async () => {
   if (Platform.OS === 'web') {
-    return null; // On web, use AsyncStorage seamlessly
+    return null;
   }
   if (!db) {
     try {
@@ -26,6 +27,23 @@ const getDb = async () => {
 };
 
 export const databaseService = {
+  // Sync CSV data string
+  syncCSVData: async (users: RegisteredUser[]): Promise<string> => {
+    const csvContent = csvService.usersToCSV(users);
+    try {
+      await AsyncStorage.setItem(ASYNC_CSV_KEY, csvContent);
+    } catch (e) {
+      console.error('[DatabaseService] CSV sync error:', e);
+    }
+    return csvContent;
+  },
+
+  // Get current CSV formatted string of all users
+  getUsersCSVString: async (): Promise<string> => {
+    const users = await databaseService.getAllUsers();
+    return csvService.usersToCSV(users);
+  },
+
   // Initialize Database Table & Default Admin Seed
   initDatabase: async (): Promise<void> => {
     try {
@@ -68,6 +86,8 @@ export const databaseService = {
         for (const u of seedUsers) {
           await databaseService.addUser(u);
         }
+      } else {
+        await databaseService.syncCSVData(users);
       }
     } catch (e) {
       console.error('[DatabaseService] initDatabase error:', e);
@@ -81,17 +101,22 @@ export const databaseService = {
       if (database) {
         const rows = await database.getAllAsync('SELECT * FROM users ORDER BY createdAt DESC;');
         if (rows && rows.length > 0) {
-          return rows as RegisteredUser[];
+          const list = rows as RegisteredUser[];
+          await databaseService.syncCSVData(list);
+          return list;
         }
       }
 
-      // Fallback / Web: AsyncStorage
       const str = await AsyncStorage.getItem(ASYNC_USERS_KEY);
-      return str ? JSON.parse(str) : [];
+      const list = str ? JSON.parse(str) : [];
+      await databaseService.syncCSVData(list);
+      return list;
     } catch (e) {
       console.error('[DatabaseService] getAllUsers error:', e);
       const str = await AsyncStorage.getItem(ASYNC_USERS_KEY);
-      return str ? JSON.parse(str) : [];
+      const list = str ? JSON.parse(str) : [];
+      await databaseService.syncCSVData(list);
+      return list;
     }
   },
 
@@ -132,7 +157,6 @@ export const databaseService = {
         );
       }
 
-      // Sync with AsyncStorage
       const allUsers = await databaseService.getAllUsers();
       const existingIdx = allUsers.findIndex((u) => u.employeeId === newUser.employeeId);
       if (existingIdx >= 0) {
@@ -141,24 +165,11 @@ export const databaseService = {
         allUsers.unshift(newUser);
       }
       await AsyncStorage.setItem(ASYNC_USERS_KEY, JSON.stringify(allUsers));
+      await databaseService.syncCSVData(allUsers);
       return true;
     } catch (e) {
       console.error('[DatabaseService] addUser error:', e);
-      // Ensure AsyncStorage fallback works even if DB throws
-      try {
-        const str = await AsyncStorage.getItem(ASYNC_USERS_KEY);
-        const allUsers: RegisteredUser[] = str ? JSON.parse(str) : [];
-        const existingIdx = allUsers.findIndex((u) => u.employeeId === newUser.employeeId);
-        if (existingIdx >= 0) {
-          allUsers[existingIdx] = newUser;
-        } else {
-          allUsers.unshift(newUser);
-        }
-        await AsyncStorage.setItem(ASYNC_USERS_KEY, JSON.stringify(allUsers));
-        return true;
-      } catch (err) {
-        return false;
-      }
+      return false;
     }
   },
 
@@ -174,12 +185,12 @@ export const databaseService = {
         );
       }
 
-      // Sync with AsyncStorage
       const allUsers = await databaseService.getAllUsers();
       const idx = allUsers.findIndex((u) => u.employeeId.toUpperCase() === cleanId);
       if (idx >= 0) {
         allUsers[idx] = { ...allUsers[idx], ...user, employeeId: cleanId };
         await AsyncStorage.setItem(ASYNC_USERS_KEY, JSON.stringify(allUsers));
+        await databaseService.syncCSVData(allUsers);
       }
       return true;
     } catch (e) {
@@ -197,10 +208,10 @@ export const databaseService = {
         await database.runAsync('DELETE FROM users WHERE UPPER(employeeId) = ?;', [cleanId]);
       }
 
-      // Sync with AsyncStorage
       const allUsers = await databaseService.getAllUsers();
       const filtered = allUsers.filter((u) => u.employeeId.toUpperCase() !== cleanId);
       await AsyncStorage.setItem(ASYNC_USERS_KEY, JSON.stringify(filtered));
+      await databaseService.syncCSVData(filtered);
       return true;
     } catch (e) {
       console.error('[DatabaseService] deleteUser error:', e);

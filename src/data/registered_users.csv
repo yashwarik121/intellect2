@@ -1,0 +1,3 @@
+EmployeeID,FullName,Email,Password,Role,CreatedAt
+EMP1001,Admin User,admin@intellect.com,adminpassword,ADMIN,2026-07-29T13:00:00.000Z
+EMP1002,Rahul Sharma,rahul.sharma@intellect.com,password123,EMPLOYEE,2026-07-29T13:00:00.000Z
