@@ -10,13 +10,14 @@ import AttendanceHomePage from '../attendance/attendanceHomePage';
 import ApplyLeavePage from '../leave/applyLeavePage';
 import PaystubListPage from '../payroll/paystubListPage';
 import AnnouncementsPage from '../announcements/announcementsPage';
+import AdminUsersPage from '../admin/adminUsersPage';
 
 interface DashboardPageProps {
   user?: RegisteredUser | null;
   onLogout: () => void;
 }
 
-type ActiveModal = 'NONE' | 'ATTENDANCE' | 'LEAVE' | 'PAYSTUBS' | 'ANNOUNCEMENTS';
+type ActiveModal = 'NONE' | 'ATTENDANCE' | 'LEAVE' | 'PAYSTUBS' | 'ANNOUNCEMENTS' | 'ADMIN';
 
 export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const [activeModal, setActiveModal] = useState<ActiveModal>('NONE');
@@ -35,9 +36,14 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
       {/* Top Header Bar */}
       <View style={styles.headerBar}>
         <IntellectLogo scale={0.7} />
-        <TouchableOpacity style={styles.logoutIconButton} onPress={handleLogoutPress}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity style={styles.adminIconButton} onPress={() => setActiveModal('ADMIN')}>
+            <Text style={styles.adminText}>⚙️ Admin</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutIconButton} onPress={handleLogoutPress}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -120,12 +126,24 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
           </TouchableOpacity>
         </View>
 
+        {/* Admin Direct Banner Button */}
+        <TouchableOpacity style={styles.adminBannerCard} onPress={() => setActiveModal('ADMIN')}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={{ fontSize: 24, marginRight: 12 }}>⚙️</Text>
+            <View>
+              <Text style={styles.adminBannerTitle}>Manage Registered Users (SQLite DB)</Text>
+              <Text style={styles.adminBannerSub}>View, add, edit & delete user accounts</Text>
+            </View>
+          </View>
+          <Text style={styles.adminBannerArrow}>→</Text>
+        </TouchableOpacity>
+
         {/* Bottom Logout Button */}
         <CustomButton
           title="Log Out of Portal"
           variant="secondary"
           onPress={handleLogoutPress}
-          style={{ marginTop: 24 }}
+          style={{ marginTop: 16 }}
         />
       </ScrollView>
 
@@ -144,6 +162,10 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
 
       <Modal visible={activeModal === 'ANNOUNCEMENTS'} animationType="slide">
         <AnnouncementsPage onClose={() => setActiveModal('NONE')} />
+      </Modal>
+
+      <Modal visible={activeModal === 'ADMIN'} animationType="slide">
+        <AdminUsersPage onClose={() => setActiveModal('NONE')} />
       </Modal>
     </View>
   );
@@ -167,6 +189,18 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
+  },
+  adminIconButton: {
+    backgroundColor: color.primaryLightGold,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  adminText: {
+    color: color.primaryDarkGold,
+    fontWeight: '700',
+    fontSize: 13,
   },
   logoutIconButton: {
     backgroundColor: '#FEE2E2',
@@ -271,7 +305,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    justify.content: 'center',
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
@@ -284,5 +318,32 @@ const styles = StyleSheet.create({
   cardSub: {
     fontSize: 12,
     color: color.textSecondary,
+  },
+  adminBannerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: color.primaryGold,
+    marginBottom: 16,
+    elevation: 2,
+  },
+  adminBannerTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: color.textPrimary,
+  },
+  adminBannerSub: {
+    fontSize: 12,
+    color: color.textSecondary,
+    marginTop: 2,
+  },
+  adminBannerArrow: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: color.primaryDarkGold,
   },
 });

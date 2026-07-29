@@ -1,15 +1,21 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, SafeAreaView, StatusBar } from 'react-native';
 import SplashPage from '../pages/splash/splashPage';
 import LoginPage from '../pages/auth/loginPage';
 import DashboardPage from '../pages/dashboard/dashboardPage';
-import { RegisteredUser } from '../services/storageService';
+import { RegisteredUser, storageService } from '../services/storageService';
+import { databaseService } from '../services/databaseService';
 
 type NavigationState = 'SPLASH' | 'AUTH' | 'DASHBOARD';
 
 export default function MainStackNavigation() {
   const [navState, setNavState] = useState<NavigationState>('SPLASH');
   const [currentUser, setCurrentUser] = useState<RegisteredUser | null>(null);
+
+  useEffect(() => {
+    // Initialize SQLite Database Table & Seed
+    databaseService.initDatabase();
+  }, []);
 
   const handleSplashFinish = (isLoggedIn: boolean, user?: RegisteredUser) => {
     if (isLoggedIn && user) {
