@@ -6,6 +6,7 @@ import { csvService } from './csvService';
 const DB_NAME = 'intellect_employee_portal.db';
 const ASYNC_USERS_KEY = '@intellect_all_users_backup';
 const ASYNC_CSV_KEY = '@intellect_all_users_csv';
+const CSV_SERVER_URL = 'http://localhost:3001/api/csv';
 
 let db: any = null;
 
@@ -27,15 +28,42 @@ const getDb = async () => {
 };
 
 export const databaseService = {
-  // Sync CSV data string
+  // Sync CSV data directly to physical disk file via server.js API
   syncCSVData: async (users: RegisteredUser[]): Promise<string> => {
     const csvContent = csvService.usersToCSV(users);
     try {
       await AsyncStorage.setItem(ASYNC_CSV_KEY, csvContent);
+
+      // Post updated CSV to server.js to physically save to src/data/registered_users.csv on disk
+      await fetch(CSV_SERVER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/csv' },
+        body: csvContent,
+      });
+      console.log('[DatabaseService] Successfully saved users permanently to src/data/registered_users.csv on disk!');
     } catch (e) {
-      console.error('[DatabaseService] CSV sync error:', e);
+      console.log('[DatabaseService] Disk CSV sync offline/skipped:', e);
     }
     return csvContent;
+  },
+
+  // Read physical CSV file from disk via server.js API
+  fetchCSVFromDisk: async (): Promise<RegisteredUser[] | null> => {
+    try {
+      const res = await fetch(CSV_SERVER_URL, { method: 'GET' });
+      if (res.ok) {
+        const text = await res.text();
+        if (text && text.trim().length > 0) {
+          const users = csvService.csvToUsers(text);
+          if (users.length > 0) {
+            return users;
+          }
+        }
+      }
+    } catch (e) {
+      console.log('[DatabaseService] Disk fetch offline/fallback to local:', e);
+    }
+    return null;
   },
 
   // Get current CSV formatted string of all users
@@ -44,7 +72,7 @@ export const databaseService = {
     return csvService.usersToCSV(users);
   },
 
-  // Initialize Database Table & Default Admin Seed
+  // Initialize Database Table & Load Physical CSV from Disk
   initDatabase: async (): Promise<void> => {
     try {
       const database = await getDb();
@@ -61,7 +89,16 @@ export const databaseService = {
         `);
       }
 
-      // Check if users exist; if empty, seed default admin & sample users
+      // Check if users exist on disk CSV file first!
+      const diskUsers = await databaseService.fetchCSVFromDisk();
+      if (diskUsers && diskUsers.length > 0) {
+        for (const u of diskUsers) {
+          await databaseService.addUser(u);
+        }
+        return;
+      }
+
+      // Check existing users
       const users = await databaseService.getAllUsers();
       if (users.length === 0) {
         const seedUsers: RegisteredUser[] = [
