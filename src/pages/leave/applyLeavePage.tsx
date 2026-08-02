@@ -1,8 +1,17 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { CustomInput } from '../../components/common/CustomInput';
 import { CustomButton } from '../../components/common/CustomButton';
 import { color } from '../../assets/colors/globalColor';
+import { leaveService, LeaveRequest } from '../../services/leaveService';
 
 interface ApplyLeavePageProps {
   onClose?: () => void;
@@ -13,10 +22,58 @@ export default function ApplyLeavePage({ onClose }: ApplyLeavePageProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
+
+  // Loading states
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = () => {
-    setSubmitted(true);
+  // Leave history array
+  const [leaveHistory, setLeaveHistory] = useState<LeaveRequest[]>([]);
+
+  // GET API: Fetch existing leave requests
+  const loadLeaveHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const data = await leaveService.getLeaves();
+      setLeaveHistory(data);
+    } catch (err) {
+      console.log('Error loading leave history');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    loadLeaveHistory();
+  }, []);
+
+  // POST API: Submit leave request
+  const handleSubmit = async () => {
+    if (!startDate.trim() || !endDate.trim() || !reason.trim()) {
+      Alert.alert('Validation Error', 'Please fill in Start Date, End Date, and Reason.');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const payload: LeaveRequest = {
+        employeeId: 'EMP1001',
+        leaveType,
+        startDate: startDate.trim(),
+        endDate: endDate.trim(),
+        reason: reason.trim(),
+      };
+
+      await leaveService.submitLeave(payload);
+      setSubmitted(true);
+      await loadLeaveHistory();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to submit leave request.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -37,7 +94,7 @@ export default function ApplyLeavePage({ onClose }: ApplyLeavePageProps) {
             <Text style={styles.successIcon}>✓</Text>
             <Text style={styles.successTitle}>Request Sent for Approval!</Text>
             <Text style={styles.successSub}>
-              Your {leaveType} request ({startDate || 'Upcoming'} to {endDate || 'Upcoming'}) has been submitted to your manager for approval.
+              Your {leaveType} request ({startDate} to {endDate}) has been posted via POST /api/leaves and sent for manager approval.
             </Text>
             <CustomButton
               title="Submit Another Request"
@@ -54,7 +111,7 @@ export default function ApplyLeavePage({ onClose }: ApplyLeavePageProps) {
         ) : (
           <View style={styles.formCard}>
             <Text style={styles.formTitle}>Leave Request Form</Text>
-            <Text style={styles.formSub}>Fill in details below to apply for approval</Text>
+            <Text style={styles.formSub}>Fill in details below to post a new leave request</Text>
 
             {/* Leave Type Selector */}
             <Text style={styles.fieldLabel}>Leave Type</Text>
@@ -93,13 +150,47 @@ export default function ApplyLeavePage({ onClose }: ApplyLeavePageProps) {
               onChangeText={setReason}
             />
 
-            <CustomButton
-              title="Submit for Approval"
-              onPress={handleSubmit}
-              style={{ marginTop: 16 }}
-            />
+            {submitting ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="large" color={color.primaryGold} />
+                <Text style={styles.loadingText}>Posting Leave Request (POST /api/leaves)...</Text>
+              </View>
+            ) : (
+              <CustomButton
+                title="Submit for Approval"
+                onPress={handleSubmit}
+                style={{ marginTop: 16 }}
+              />
+            )}
           </View>
         )}
+
+        {/* Existing Leave Requests List */}
+        <View style={styles.historySection}>
+          <Text style={styles.historySectionTitle}>Your Submitted Leave Requests (GET /api/leaves)</Text>
+
+          {loadingHistory ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="small" color={color.primaryGold} />
+              <Text style={styles.loadingText}>Fetching leave requests...</Text>
+            </View>
+          ) : (
+            leaveHistory.map((item) => (
+              <View key={item.id || item.startDate} style={styles.historyCard}>
+                <View style={styles.historyHeader}>
+                  <Text style={styles.historyType}>{item.leaveType}</Text>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>{item.status || 'PENDING'}</Text>
+                  </View>
+                </View>
+                <Text style={styles.historyDates}>
+                  📅 {item.startDate} to {item.endDate}
+                </Text>
+                <Text style={styles.historyReason}>Reason: {item.reason}</Text>
+              </View>
+            ))
+          )}
+        </View>
       </ScrollView>
     </View>
   );
@@ -144,6 +235,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     elevation: 3,
+    marginBottom: 20,
   },
   formTitle: {
     fontSize: 20,
@@ -189,13 +281,24 @@ const styles = StyleSheet.create({
     color: color.primaryDarkGold,
     fontWeight: 'bold',
   },
+  loadingBox: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: color.primaryDarkGold,
+    fontWeight: '600',
+  },
   successCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 30,
     alignItems: 'center',
     elevation: 3,
-    marginTop: 20,
+    marginTop: 10,
+    marginBottom: 20,
   },
   successIcon: {
     fontSize: 48,
@@ -214,5 +317,53 @@ const styles = StyleSheet.create({
     color: color.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  historySection: {
+    marginTop: 8,
+  },
+  historySectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: color.textPrimary,
+    marginBottom: 12,
+  },
+  historyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    elevation: 2,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  historyType: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: color.textPrimary,
+  },
+  statusBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#D97706',
+  },
+  historyDates: {
+    fontSize: 13,
+    color: color.textSecondary,
+    marginBottom: 4,
+  },
+  historyReason: {
+    fontSize: 13,
+    color: color.textPrimary,
+    fontStyle: 'italic',
   },
 });

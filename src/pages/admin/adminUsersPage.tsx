@@ -8,11 +8,13 @@ import {
   Modal,
   Alert,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { CustomInput } from '../../components/common/CustomInput';
 import { color } from '../../assets/colors/globalColor';
 import { storageService, RegisteredUser } from '../../services/storageService';
 import { databaseService } from '../../services/databaseService';
+import { authService } from '../../services/authService';
 
 interface AdminUsersPageProps {
   onClose: () => void;
@@ -21,6 +23,7 @@ interface AdminUsersPageProps {
 export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
   const [users, setUsers] = useState<RegisteredUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,10 +41,10 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
   const [formPassword, setFormPassword] = useState('');
   const [formRole, setFormRole] = useState<'EMPLOYEE' | 'ADMIN'>('EMPLOYEE');
 
-  // Load all users from SQLite DB
+  // GET API: Load all registered employees
   const loadUsers = async () => {
     setLoading(true);
-    const list = await storageService.getAllUsers();
+    const list = await authService.getEmployees();
     setUsers(list);
     setLoading(false);
   };
@@ -80,6 +83,7 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
     setShowCSVModal(true);
   };
 
+  // POST API: Save/Register user
   const handleSaveUser = async () => {
     if (!formEmpId.trim() || !formFullName.trim() || !formEmail.trim() || !formPassword.trim()) {
       Alert.alert('Validation Error', 'Please fill in all user fields.');
@@ -91,6 +95,8 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
       return;
     }
 
+    setSubmitting(true);
+
     const userData: RegisteredUser = {
       employeeId: formEmpId.trim().toUpperCase(),
       fullName: formFullName.trim(),
@@ -100,22 +106,31 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
       createdAt: new Date().toISOString(),
     };
 
-    if (isEditing) {
-      await storageService.updateUser(userData);
-      Alert.alert('Success', `User ${userData.employeeId} updated successfully.`);
-    } else {
-      const existing = await storageService.getUserByEmployeeId(userData.employeeId);
-      if (existing) {
-        Alert.alert('Error', `Employee ID ${userData.employeeId} already exists!`);
-        return;
-      }
-      await storageService.registerUser(userData);
-      Alert.alert('Success', `User ${userData.employeeId} registered and saved to CSV.`);
-    }
+    try {
+      if (isEditing) {
+        await storageService.updateUser(userData);
+        Alert.alert('Success', `User ${userData.employeeId} updated successfully.`);
+      } else {
+        const existing = await storageService.getUserByEmployeeId(userData.employeeId);
+        if (existing) {
+          Alert.alert('Error', `Employee ID ${userData.employeeId} already exists!`);
+          setSubmitting(false);
+          return;
+        }
 
-    setShowFormModal(false);
-    resetForm();
-    loadUsers();
+        // Call POST API for registered employee
+        await authService.registerEmployee(userData);
+        Alert.alert('Success', `User ${userData.employeeId} registered and saved to CSV.`);
+      }
+
+      setShowFormModal(false);
+      resetForm();
+      await loadUsers();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save employee record.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDeleteUser = (empId: string) => {
@@ -128,8 +143,9 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            setLoading(true);
             await storageService.deleteUser(empId);
-            loadUsers();
+            await loadUsers();
           },
         },
       ]
@@ -176,64 +192,71 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
 
         <Text style={styles.countText}>
           Total Registered Users: <Text style={{ fontWeight: 'bold', color: color.primaryDarkGold }}>{users.length}</Text>
-          <Text style={{ fontStyle: 'italic', color: color.textSecondary }}> (Saved in src/data/registered_users.csv)</Text>
+          <Text style={{ fontStyle: 'italic', color: color.textSecondary }}> (Synced with src/data/registered_users.csv)</Text>
         </Text>
 
-        {/* Users Table List */}
-        <ScrollView style={styles.scrollList}>
-          {filteredUsers.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No registered users found.</Text>
-            </View>
-          ) : (
-            filteredUsers.map((user) => (
-              <View key={user.employeeId} style={styles.userCard}>
-                <View style={styles.userCardHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={styles.avatarCircle}>
-                      <Text style={styles.avatarText}>{user.fullName.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <View style={{ marginLeft: 10 }}>
-                      <Text style={styles.userName}>{user.fullName}</Text>
-                      <Text style={styles.userEmpId}>{user.employeeId}</Text>
-                    </View>
-                  </View>
-                  <View style={[styles.roleBadge, user.role === 'ADMIN' ? styles.roleAdmin : styles.roleEmp]}>
-                    <Text style={[styles.roleBadgeText, user.role === 'ADMIN' ? styles.roleAdminText : styles.roleEmpText]}>
-                      {user.role || 'EMPLOYEE'}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.userCardDivider} />
-
-                <View style={styles.userDetailRow}>
-                  <Text style={styles.detailLabel}>Email:</Text>
-                  <Text style={styles.detailVal}>{user.email}</Text>
-                </View>
-                <View style={styles.userDetailRow}>
-                  <Text style={styles.detailLabel}>Password:</Text>
-                  <Text style={styles.detailVal}>•••••••• ({user.password})</Text>
-                </View>
-
-                <View style={styles.cardActionsRow}>
-                  <TouchableOpacity
-                    style={styles.editBtn}
-                    onPress={() => handleOpenEditModal(user)}
-                  >
-                    <Text style={styles.editBtnText}>✏️ Edit User</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={() => handleDeleteUser(user.employeeId)}
-                  >
-                    <Text style={styles.deleteBtnText}>🗑️ Delete</Text>
-                  </TouchableOpacity>
-                </View>
+        {/* Users Table List with Loading Spinner */}
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={color.primaryGold} />
+            <Text style={styles.loadingText}>Fetching registered employees (GET /api/employees)...</Text>
+          </View>
+        ) : (
+          <ScrollView style={styles.scrollList}>
+            {filteredUsers.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyText}>No registered users found.</Text>
               </View>
-            ))
-          )}
-        </ScrollView>
+            ) : (
+              filteredUsers.map((user) => (
+                <View key={user.employeeId} style={styles.userCard}>
+                  <View style={styles.userCardHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={styles.avatarCircle}>
+                        <Text style={styles.avatarText}>{user.fullName.charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <View style={{ marginLeft: 10 }}>
+                        <Text style={styles.userName}>{user.fullName}</Text>
+                        <Text style={styles.userEmpId}>{user.employeeId}</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.roleBadge, user.role === 'ADMIN' ? styles.roleAdmin : styles.roleEmp]}>
+                      <Text style={[styles.roleBadgeText, user.role === 'ADMIN' ? styles.roleAdminText : styles.roleEmpText]}>
+                        {user.role || 'EMPLOYEE'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.userCardDivider} />
+
+                  <View style={styles.userDetailRow}>
+                    <Text style={styles.detailLabel}>Email:</Text>
+                    <Text style={styles.detailVal}>{user.email}</Text>
+                  </View>
+                  <View style={styles.userDetailRow}>
+                    <Text style={styles.detailLabel}>Password:</Text>
+                    <Text style={styles.detailVal}>•••••••• ({user.password})</Text>
+                  </View>
+
+                  <View style={styles.cardActionsRow}>
+                    <TouchableOpacity
+                      style={styles.editBtn}
+                      onPress={() => handleOpenEditModal(user)}
+                    >
+                      <Text style={styles.editBtnText}>✏️ Edit User</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteBtn}
+                      onPress={() => handleDeleteUser(user.employeeId)}
+                    >
+                      <Text style={styles.deleteBtnText}>🗑️ Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        )}
       </View>
 
       {/* --- ADD / EDIT USER MODAL --- */}
@@ -298,14 +321,25 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
               <TouchableOpacity
                 style={styles.cancelModalBtn}
                 onPress={() => setShowFormModal(false)}
+                disabled={submitting}
               >
                 <Text style={styles.cancelModalBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveModalBtn} onPress={handleSaveUser}>
-                <Text style={styles.saveModalBtnText}>
-                  {isEditing ? 'Save Changes' : 'Create User'}
-                </Text>
-              </TouchableOpacity>
+
+              {submitting ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10 }}>
+                  <ActivityIndicator size="small" color={color.primaryGold} />
+                  <Text style={{ fontSize: 13, color: color.primaryDarkGold, marginLeft: 6, fontWeight: '600' }}>
+                    Posting User...
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.saveModalBtn} onPress={handleSaveUser}>
+                  <Text style={styles.saveModalBtnText}>
+                    {isEditing ? 'Save Changes' : 'Create User'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -429,6 +463,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: color.textSecondary,
     marginBottom: 12,
+  },
+  loadingBox: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: color.primaryDarkGold,
+    fontWeight: '600',
   },
   scrollList: {
     flex: 1,

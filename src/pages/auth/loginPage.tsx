@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { IntellectLogo } from '../../components/common/IntellectLogo';
 import { CustomInput } from '../../components/common/CustomInput';
 import { CustomButton } from '../../components/common/CustomButton';
 import { color } from '../../assets/colors/globalColor';
 import { storageService, RegisteredUser } from '../../services/storageService';
+import { authService } from '../../services/authService';
 
 interface LoginPageProps {
   onLoginSuccess: (user: RegisteredUser) => void;
@@ -20,6 +22,7 @@ interface LoginPageProps {
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [isLoginTab, setIsLoginTab] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Login form state
   const [loginEmpId, setLoginEmpId] = useState('');
@@ -37,7 +40,12 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
   // Email helper validator
   const isValidEmail = (email: string) => {
-    return email.includes('@') && email.includes('.') && email.indexOf('@') > 0 && email.lastIndexOf('.') > email.indexOf('@');
+    return (
+      email.includes('@') &&
+      email.includes('.') &&
+      email.indexOf('@') > 0 &&
+      email.lastIndexOf('.') > email.indexOf('@')
+    );
   };
 
   const handleRegister = async () => {
@@ -47,13 +55,14 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       return;
     }
 
-    // Email validation
     if (!isValidEmail(regEmail.trim())) {
-      setMessage({ type: 'error', text: 'Please enter a valid email address containing "@" (e.g. name@company.com).' });
+      setMessage({
+        type: 'error',
+        text: 'Please enter a valid email address containing "@" (e.g. name@company.com).',
+      });
       return;
     }
 
-    // Password validation (min 6 characters)
     if (regPassword.length < 6) {
       setMessage({ type: 'error', text: 'Password must be at least 6 characters long.' });
       return;
@@ -64,35 +73,45 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       return;
     }
 
-    // Check if employee already exists
-    const existing = await storageService.getUserByEmployeeId(regEmpId);
-    if (existing) {
-      setMessage({ type: 'error', text: `Employee ID "${regEmpId}" is already registered!` });
-      return;
-    }
+    setLoading(true);
 
-    const newUser: RegisteredUser = {
-      employeeId: regEmpId.trim().toUpperCase(),
-      fullName: regFullName.trim(),
-      email: regEmail.trim(),
-      password: regPassword,
-    };
+    try {
+      // Check if employee already exists
+      const existing = await storageService.getUserByEmployeeId(regEmpId);
+      if (existing) {
+        setMessage({ type: 'error', text: `Employee ID "${regEmpId}" is already registered!` });
+        setLoading(false);
+        return;
+      }
 
-    const success = await storageService.registerUser(newUser);
-    if (success) {
-      setMessage({
-        type: 'success',
-        text: 'Registration successful! You can now log in.',
-      });
-      setLoginEmpId(newUser.employeeId);
-      setRegEmpId('');
-      setRegFullName('');
-      setRegEmail('');
-      setRegPassword('');
-      setRegConfirmPassword('');
-      setIsLoginTab(true);
-    } else {
-      setMessage({ type: 'error', text: 'Registration failed. Please try again.' });
+      const newUser: RegisteredUser = {
+        employeeId: regEmpId.trim().toUpperCase(),
+        fullName: regFullName.trim(),
+        email: regEmail.trim(),
+        password: regPassword,
+      };
+
+      // Call POST API for registered employee & disk CSV sync
+      const success = await authService.registerEmployee(newUser);
+      if (success) {
+        setMessage({
+          type: 'success',
+          text: 'Registration successful! Employee data saved & synced.',
+        });
+        setLoginEmpId(newUser.employeeId);
+        setRegEmpId('');
+        setRegFullName('');
+        setRegEmail('');
+        setRegPassword('');
+        setRegConfirmPassword('');
+        setIsLoginTab(true);
+      } else {
+        setMessage({ type: 'error', text: 'Registration failed. Please try again.' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred.' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -108,23 +127,32 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       return;
     }
 
-    const user = await storageService.getUserByEmployeeId(loginEmpId);
-    if (!user) {
-      setMessage({
-        type: 'error',
-        text: `No account found for Employee ID "${loginEmpId}". Please register first.`,
-      });
-      return;
-    }
+    setLoading(true);
 
-    if (user.password !== loginPassword) {
-      setMessage({ type: 'error', text: 'Incorrect password. Please try again.' });
-      return;
-    }
+    try {
+      const user = await storageService.getUserByEmployeeId(loginEmpId);
+      if (!user) {
+        setMessage({
+          type: 'error',
+          text: `No account found for Employee ID "${loginEmpId}". Please register first.`,
+        });
+        setLoading(false);
+        return;
+      }
 
-    // Login success
-    await storageService.setSessionUser(user);
-    onLoginSuccess(user);
+      if (user.password !== loginPassword) {
+        setMessage({ type: 'error', text: 'Incorrect password. Please try again.' });
+        setLoading(false);
+        return;
+      }
+
+      await storageService.setSessionUser(user);
+      onLoginSuccess(user);
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Login failed. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -202,11 +230,18 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 secureTextEntry
               />
 
-              <CustomButton
-                title="Sign In"
-                onPress={handleLogin}
-                style={{ marginTop: 16 }}
-              />
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={color.primaryGold} />
+                  <Text style={styles.loadingText}>Authenticating employee...</Text>
+                </View>
+              ) : (
+                <CustomButton
+                  title="Sign In"
+                  onPress={handleLogin}
+                  style={{ marginTop: 16 }}
+                />
+              )}
             </View>
           ) : (
             // --- REGISTER FORM ---
@@ -250,11 +285,18 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 secureTextEntry
               />
 
-              <CustomButton
-                title="Register Employee"
-                onPress={handleRegister}
-                style={{ marginTop: 16 }}
-              />
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={color.primaryGold} />
+                  <Text style={styles.loadingText}>Posting new employee registration...</Text>
+                </View>
+              ) : (
+                <CustomButton
+                  title="Register Employee"
+                  onPress={handleRegister}
+                  style={{ marginTop: 16 }}
+                />
+              )}
             </View>
           )}
         </View>
@@ -357,6 +399,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: color.textSecondary,
     marginBottom: 16,
+  },
+  loadingContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: color.primaryDarkGold,
+    fontWeight: '600',
   },
   footerNote: {
     textAlign: 'center',

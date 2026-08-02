@@ -1,0 +1,12 @@
+[
+  {
+    "id": "LV-101",
+    "employeeId": "EMP1002",
+    "leaveType": "Casual Leave",
+    "startDate": "2026-08-05",
+    "endDate": "2026-08-07",
+    "reason": "Family vacation",
+    "status": "PENDING",
+    "appliedDate": "2026-08-01"
+  }
+]

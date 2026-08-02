@@ -1,3 +1,6 @@
 EmployeeID,FullName,Email,Password,Role,CreatedAt
-EMP1001,Admin User,admin@intellect.com,adminpassword,ADMIN,2026-07-29T13:00:00.000Z
-EMP1002,Rahul Sharma,rahul.sharma@intellect.com,password123,EMPLOYEE,2026-07-29T13:00:00.000Z
+"12345","Sarahj","yashwarik12@gmail.com","123456","EMPLOYEE","2026-07-30T06:34:13.455Z"
+"1234","yashwarik","yashwarik19@gmail.com","123456","EMPLOYEE","2026-07-30T06:23:54.435Z"
+"1909","yw","yashwarik85@gmail.com","123456","EMPLOYEE","2026-07-30T06:18:05.126Z"
+"EMP1002","Rahul Sharma","rahul.sharma@intellect.com","password123","EMPLOYEE","2026-07-29T13:00:00.000Z"
+"EMP1001","Admin User","admin@intellect.com","adminpassword","ADMIN","2026-07-29T13:00:00.000Z"

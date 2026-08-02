@@ -1,52 +1,49 @@
-import { constant } from './constantServices';
-import { utilLog } from './utilServices';
+const API_BASE_URL = 'http://localhost:3001';
 
-export function httpPostFetch(apiUrl: string, body: any, hideAlert?: boolean, isHideToken?: boolean): Promise<any> {
+export function httpPostFetch(apiUrl: string, body: any): Promise<any> {
   return new Promise(async (resolve, reject) => {
     try {
-      utilLog(constant.rootUrl + apiUrl);
-      const header: any = {
-        'Content-Type': 'application/json',
-      };
-      if (!isHideToken) {
-        // Placeholder for Auth token header attachment
-      }
-      const response = await fetch(`${constant.rootUrl}${apiUrl}`, {
+      const fullUrl = apiUrl.startsWith('http') ? apiUrl : `${API_BASE_URL}${apiUrl}`;
+      const response = await fetch(fullUrl, {
         method: 'POST',
-        headers: header,
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(body),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
       resolve(data);
     } catch (err) {
-      if (!hideAlert) {
-        console.error('HTTP Post Error:', err);
-      }
+      console.warn('[HTTP POST Fail]:', apiUrl, err);
       reject(err);
     }
   });
 }
 
-export function httpGetFetch(apiUrl: string, hideAlert?: boolean, isHideToken?: boolean): Promise<any> {
+export function httpGetFetch(apiUrl: string): Promise<any> {
   return new Promise(async (resolve, reject) => {
     try {
-      utilLog(constant.rootUrl + apiUrl);
-      const header: any = {
-        'Content-Type': 'application/json',
-      };
-      if (!isHideToken) {
-        // Placeholder for Auth token header attachment
-      }
-      const response = await fetch(`${constant.rootUrl}${apiUrl}`, {
+      const fullUrl = apiUrl.startsWith('http') ? apiUrl : `${API_BASE_URL}${apiUrl}`;
+      const response = await fetch(fullUrl, {
         method: 'GET',
-        headers: header,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
       resolve(data);
     } catch (err) {
-      if (!hideAlert) {
-        console.error('HTTP Get Error:', err);
-      }
+      console.warn('[HTTP GET Fail]:', apiUrl, err);
       reject(err);
     }
   });
