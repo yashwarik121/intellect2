@@ -12,6 +12,7 @@ import {
 import { IntellectLogo } from '../../components/common/IntellectLogo';
 import { CustomInput } from '../../components/common/CustomInput';
 import { CustomButton } from '../../components/common/CustomButton';
+import { SwalAlert, SwalType } from '../../components/common/SwalAlert';
 import { color } from '../../assets/colors/globalColor';
 import { storageService, RegisteredUser } from '../../services/storageService';
 import { authService } from '../../services/authService';
@@ -35,8 +36,35 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
 
-  // UI status message
+  // UI status message banner
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Swal Popup State
+  const [swalState, setSwalState] = useState<{
+    visible: boolean;
+    type: SwalType;
+    title: string;
+    text: string;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'success',
+    title: '',
+    text: '',
+  });
+
+  const showSwal = (type: SwalType, title: string, text: string, onConfirm?: () => void) => {
+    setSwalState({
+      visible: true,
+      type,
+      title,
+      text,
+      onConfirm: () => {
+        setSwalState((prev) => ({ ...prev, visible: false }));
+        if (onConfirm) onConfirm();
+      },
+    });
+  };
 
   // Email helper validator
   const isValidEmail = (email: string) => {
@@ -51,25 +79,22 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const handleRegister = async () => {
     setMessage(null);
     if (!regEmpId.trim() || !regFullName.trim() || !regEmail.trim() || !regPassword) {
-      setMessage({ type: 'error', text: 'Please fill in all required fields.' });
+      showSwal('warning', 'Missing Information', 'Please fill in all required fields.');
       return;
     }
 
     if (!isValidEmail(regEmail.trim())) {
-      setMessage({
-        type: 'error',
-        text: 'Please enter a valid email address containing "@" (e.g. name@company.com).',
-      });
+      showSwal('error', 'Invalid Email', 'Please enter a valid email address containing "@" (e.g. name@company.com).');
       return;
     }
 
     if (regPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters long.' });
+      showSwal('warning', 'Weak Password', 'Password must be at least 6 characters long.');
       return;
     }
 
     if (regPassword !== regConfirmPassword) {
-      setMessage({ type: 'error', text: 'Passwords do not match.' });
+      showSwal('error', 'Password Mismatch', 'Passwords do not match.');
       return;
     }
 
@@ -79,7 +104,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       // Check if employee already exists
       const existing = await storageService.getUserByEmployeeId(regEmpId);
       if (existing) {
-        setMessage({ type: 'error', text: `Employee ID "${regEmpId}" is already registered!` });
+        showSwal('error', 'Registration Error', `Employee ID "${regEmpId}" is already registered!`);
         setLoading(false);
         return;
       }
@@ -91,13 +116,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         password: regPassword,
       };
 
-      // Call POST API for registered employee & disk CSV sync
       const success = await authService.registerEmployee(newUser);
       if (success) {
-        setMessage({
-          type: 'success',
-          text: 'Registration successful! Employee data saved & synced.',
-        });
         setLoginEmpId(newUser.employeeId);
         setRegEmpId('');
         setRegFullName('');
@@ -105,11 +125,18 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         setRegPassword('');
         setRegConfirmPassword('');
         setIsLoginTab(true);
+
+        // --- SWAL ALERT FOR REGISTRATION ---
+        showSwal(
+          'success',
+          'Registration Successful!',
+          `Employee ID "${newUser.employeeId}" has been registered and saved.`
+        );
       } else {
-        setMessage({ type: 'error', text: 'Registration failed. Please try again.' });
+        showSwal('error', 'Registration Failed', 'Could not register employee. Please try again.');
       }
     } catch (err) {
-      setMessage({ type: 'error', text: 'An unexpected error occurred.' });
+      showSwal('error', 'Error', 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
@@ -118,12 +145,12 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const handleLogin = async () => {
     setMessage(null);
     if (!loginEmpId.trim() || !loginPassword) {
-      setMessage({ type: 'error', text: 'Please enter your Employee ID and Password.' });
+      showSwal('warning', 'Missing Credentials', 'Please enter your Employee ID and Password.');
       return;
     }
 
     if (loginPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters long.' });
+      showSwal('warning', 'Invalid Password', 'Password must be at least 6 characters long.');
       return;
     }
 
@@ -132,24 +159,30 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     try {
       const user = await storageService.getUserByEmployeeId(loginEmpId);
       if (!user) {
-        setMessage({
-          type: 'error',
-          text: `No account found for Employee ID "${loginEmpId}". Please register first.`,
-        });
+        showSwal('error', 'Account Not Found', `No account found for Employee ID "${loginEmpId}". Please register first.`);
         setLoading(false);
         return;
       }
 
       if (user.password !== loginPassword) {
-        setMessage({ type: 'error', text: 'Incorrect password. Please try again.' });
+        showSwal('error', 'Authentication Failed', 'Incorrect password. Please try again.');
         setLoading(false);
         return;
       }
 
       await storageService.setSessionUser(user);
-      onLoginSuccess(user);
+
+      // --- SWAL ALERT FOR LOGIN ---
+      showSwal(
+        'success',
+        'Login Successful!',
+        `Welcome back, ${user.fullName}! Redirecting to your dashboard...`,
+        () => {
+          onLoginSuccess(user);
+        }
+      );
     } catch (err) {
-      setMessage({ type: 'error', text: 'Login failed. Please try again.' });
+      showSwal('error', 'Error', 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -300,6 +333,15 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             </View>
           )}
         </View>
+
+        {/* --- SWAL ALERT POPUP MODAL --- */}
+        <SwalAlert
+          visible={swalState.visible}
+          type={swalState.type}
+          title={swalState.title}
+          text={swalState.text}
+          onConfirm={swalState.onConfirm}
+        />
 
         <Text style={styles.footerNote}>Intellect Design Arena • A Nihilent Company</Text>
       </ScrollView>

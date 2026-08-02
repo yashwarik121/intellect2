@@ -6,10 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { CustomInput } from '../../components/common/CustomInput';
 import { CustomButton } from '../../components/common/CustomButton';
+import { SwalAlert, SwalType } from '../../components/common/SwalAlert';
 import { color } from '../../assets/colors/globalColor';
 import { leaveService, LeaveRequest } from '../../services/leaveService';
 
@@ -23,13 +23,30 @@ export default function ApplyLeavePage({ onClose }: ApplyLeavePageProps) {
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
 
-  // Loading states
+  // Loading & submission states
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   // Leave history array
   const [leaveHistory, setLeaveHistory] = useState<LeaveRequest[]>([]);
+
+  // Swal Alert State
+  const [swalState, setSwalState] = useState<{
+    visible: boolean;
+    type: SwalType;
+    title: string;
+    text: string;
+  }>({
+    visible: false,
+    type: 'success',
+    title: '',
+    text: '',
+  });
+
+  const showSwal = (type: SwalType, title: string, text: string) => {
+    setSwalState({ visible: true, type, title, text });
+  };
 
   // GET API: Fetch existing leave requests
   const loadLeaveHistory = async () => {
@@ -51,7 +68,7 @@ export default function ApplyLeavePage({ onClose }: ApplyLeavePageProps) {
   // POST API: Submit leave request
   const handleSubmit = async () => {
     if (!startDate.trim() || !endDate.trim() || !reason.trim()) {
-      Alert.alert('Validation Error', 'Please fill in Start Date, End Date, and Reason.');
+      showSwal('warning', 'Incomplete Form', 'Please fill in Start Date, End Date, and Reason.');
       return;
     }
 
@@ -69,8 +86,15 @@ export default function ApplyLeavePage({ onClose }: ApplyLeavePageProps) {
       await leaveService.submitLeave(payload);
       setSubmitted(true);
       await loadLeaveHistory();
+
+      // --- SWAL ALERT FOR LEAVE FORM SUBMISSION ---
+      showSwal(
+        'success',
+        'Leave Form Submitted!',
+        `Your ${leaveType} request (${startDate} to ${endDate}) has been posted for manager approval.`
+      );
     } catch (err) {
-      Alert.alert('Error', 'Failed to submit leave request.');
+      showSwal('error', 'Submission Failed', 'Failed to submit leave request. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -191,6 +215,15 @@ export default function ApplyLeavePage({ onClose }: ApplyLeavePageProps) {
             ))
           )}
         </View>
+
+        {/* --- SWAL ALERT MODAL --- */}
+        <SwalAlert
+          visible={swalState.visible}
+          type={swalState.type}
+          title={swalState.title}
+          text={swalState.text}
+          onConfirm={() => setSwalState((prev) => ({ ...prev, visible: false }))}
+        />
       </ScrollView>
     </View>
   );

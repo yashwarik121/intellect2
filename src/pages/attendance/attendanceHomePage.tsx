@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { CustomButton } from '../../components/common/CustomButton';
+import { SwalAlert, SwalType } from '../../components/common/SwalAlert';
 import { color } from '../../assets/colors/globalColor';
 
 interface AttendanceHomePageProps {
@@ -10,18 +11,17 @@ interface AttendanceHomePageProps {
 // Generate calendar days with status for July 2026
 const monthDays = Array.from({ length: 31 }, (_, i) => {
   const dayNum = i + 1;
-  // Sunday or Saturday -> Weekend
-  const dayOfWeek = (dayNum + 2) % 7; // Approx day offset
+  const dayOfWeek = (dayNum + 2) % 7;
   let status: 'PRESENT' | 'ABSENT' | 'HALF_DAY' | 'WEEKEND' = 'PRESENT';
 
   if (dayOfWeek === 0 || dayOfWeek === 6) {
     status = 'WEEKEND';
   } else if (dayNum === 5 || dayNum === 14 || dayNum === 22) {
-    status = 'ABSENT'; // Red
+    status = 'ABSENT';
   } else if (dayNum === 9 || dayNum === 19 || dayNum === 27) {
-    status = 'HALF_DAY'; // Yellow
+    status = 'HALF_DAY';
   } else {
-    status = 'PRESENT'; // Green
+    status = 'PRESENT';
   }
 
   return { day: dayNum, status };
@@ -32,27 +32,58 @@ export default function AttendanceHomePage({ onClose }: AttendanceHomePageProps)
   const [clockInTime, setClockInTime] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
+  // Swal Alert State
+  const [swalState, setSwalState] = useState<{
+    visible: boolean;
+    type: SwalType;
+    title: string;
+    text: string;
+  }>({
+    visible: false,
+    type: 'success',
+    title: '',
+    text: '',
+  });
+
+  const showSwal = (type: SwalType, title: string, text: string) => {
+    setSwalState({ visible: true, type, title, text });
+  };
+
   const handleClockInToggle = () => {
     if (!clockedIn) {
       const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setClockedIn(true);
       setClockInTime(now);
+
+      // --- SWAL ALERT FOR CLOCK IN ---
+      showSwal(
+        'success',
+        'Clock In Successful!',
+        `Your attendance for today has been logged at ${now}.`
+      );
     } else {
       setClockedIn(false);
       setClockInTime(null);
+
+      // --- SWAL ALERT FOR CLOCK OUT ---
+      showSwal(
+        'info',
+        'Clock Out Recorded!',
+        'You have successfully clocked out for today. Have a great evening!'
+      );
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PRESENT':
-        return '#10B981'; // Green
+        return '#10B981';
       case 'ABSENT':
-        return '#EF4444'; // Red
+        return '#EF4444';
       case 'HALF_DAY':
-        return '#F59E0B'; // Yellow
+        return '#F59E0B';
       default:
-        return '#E5E7EB'; // Weekend/Gray
+        return '#E5E7EB';
     }
   };
 
@@ -165,6 +196,15 @@ export default function AttendanceHomePage({ onClose }: AttendanceHomePageProps)
           </View>
         )}
       </ScrollView>
+
+      {/* --- SWAL ALERT MODAL --- */}
+      <SwalAlert
+        visible={swalState.visible}
+        type={swalState.type}
+        title={swalState.title}
+        text={swalState.text}
+        onConfirm={() => setSwalState((prev) => ({ ...prev, visible: false }))}
+      />
     </View>
   );
 }
