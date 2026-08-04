@@ -14,7 +14,7 @@ import { CustomInput } from '../../components/common/CustomInput';
 import { CustomButton } from '../../components/common/CustomButton';
 import { SwalAlert, SwalType } from '../../components/common/SwalAlert';
 import { color } from '../../assets/colors/globalColor';
-import { storageService, RegisteredUser } from '../../services/storageService';
+import { RegisteredUser } from '../../services/storageService';
 import { authService } from '../../services/authService';
 
 interface LoginPageProps {
@@ -35,9 +35,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
-
-  // UI status message banner
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Swal Popup State
   const [swalState, setSwalState] = useState<{
@@ -66,7 +63,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     });
   };
 
-  // Email helper validator
   const isValidEmail = (email: string) => {
     return (
       email.includes('@') &&
@@ -76,8 +72,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     );
   };
 
+  // POST /api/register
   const handleRegister = async () => {
-    setMessage(null);
     if (!regEmpId.trim() || !regFullName.trim() || !regEmail.trim() || !regPassword) {
       showSwal('warning', 'Missing Information', 'Please fill in all required fields.');
       return;
@@ -101,14 +97,6 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     setLoading(true);
 
     try {
-      // Check if employee already exists
-      const existing = await storageService.getUserByEmployeeId(regEmpId);
-      if (existing) {
-        showSwal('error', 'Registration Error', `Employee ID "${regEmpId}" is already registered!`);
-        setLoading(false);
-        return;
-      }
-
       const newUser: RegisteredUser = {
         employeeId: regEmpId.trim().toUpperCase(),
         fullName: regFullName.trim(),
@@ -116,8 +104,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         password: regPassword,
       };
 
-      const success = await authService.registerEmployee(newUser);
-      if (success) {
+      // Call POST /api/register API
+      const result = await authService.registerEmployee(newUser);
+
+      if (result.success) {
         setLoginEmpId(newUser.employeeId);
         setRegEmpId('');
         setRegFullName('');
@@ -126,24 +116,23 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         setRegConfirmPassword('');
         setIsLoginTab(true);
 
-        // --- SWAL ALERT FOR REGISTRATION ---
         showSwal(
           'success',
           'Registration Successful!',
-          `Employee ID "${newUser.employeeId}" has been registered and saved.`
+          `Employee ID "${newUser.employeeId}" has been registered via POST /api/register and saved to CSV.`
         );
       } else {
-        showSwal('error', 'Registration Failed', 'Could not register employee. Please try again.');
+        showSwal('error', 'Registration Error', result.error || 'Failed to register employee.');
       }
     } catch (err) {
-      showSwal('error', 'Error', 'An unexpected error occurred.');
+      showSwal('error', 'Error', 'An unexpected error occurred during registration.');
     } finally {
       setLoading(false);
     }
   };
 
+  // POST /api/login
   const handleLogin = async () => {
-    setMessage(null);
     if (!loginEmpId.trim() || !loginPassword) {
       showSwal('warning', 'Missing Credentials', 'Please enter your Employee ID and Password.');
       return;
@@ -157,30 +146,25 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     setLoading(true);
 
     try {
-      const user = await storageService.getUserByEmployeeId(loginEmpId);
-      if (!user) {
-        showSwal('error', 'Account Not Found', `No account found for Employee ID "${loginEmpId}". Please register first.`);
-        setLoading(false);
-        return;
+      // Call POST /api/login API
+      const result = await authService.loginEmployee({
+        employeeId: loginEmpId.trim().toUpperCase(),
+        password: loginPassword,
+      });
+
+      if (result.success && result.user) {
+        const loggedUser = result.user;
+        showSwal(
+          'success',
+          'Login Successful!',
+          `Welcome back, ${loggedUser.fullName}! Redirecting to your dashboard...`,
+          () => {
+            onLoginSuccess(loggedUser);
+          }
+        );
+      } else {
+        showSwal('error', 'Authentication Error', result.error || 'Invalid credentials.');
       }
-
-      if (user.password !== loginPassword) {
-        showSwal('error', 'Authentication Failed', 'Incorrect password. Please try again.');
-        setLoading(false);
-        return;
-      }
-
-      await storageService.setSessionUser(user);
-
-      // --- SWAL ALERT FOR LOGIN ---
-      showSwal(
-        'success',
-        'Login Successful!',
-        `Welcome back, ${user.fullName}! Redirecting to your dashboard...`,
-        () => {
-          onLoginSuccess(user);
-        }
-      );
     } catch (err) {
       showSwal('error', 'Error', 'Login failed. Please try again.');
     } finally {
@@ -204,41 +188,17 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
         <View style={styles.tabContainer}>
           <TouchableOpacity
             style={[styles.tabButton, isLoginTab && styles.activeTabButton]}
-            onPress={() => {
-              setIsLoginTab(true);
-              setMessage(null);
-            }}
+            onPress={() => setIsLoginTab(true)}
           >
             <Text style={[styles.tabText, isLoginTab && styles.activeTabText]}>Login</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tabButton, !isLoginTab && styles.activeTabButton]}
-            onPress={() => {
-              setIsLoginTab(false);
-              setMessage(null);
-            }}
+            onPress={() => setIsLoginTab(false)}
           >
             <Text style={[styles.tabText, !isLoginTab && styles.activeTabText]}>Register</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Notification Message */}
-        {message && (
-          <View
-            style={[
-              styles.messageBanner,
-              message.type === 'error' ? styles.errorMessage : styles.successMessage,
-            ]}
-          >
-            <Text
-              style={
-                message.type === 'error' ? styles.errorMessageText : styles.successMessageText
-              }
-            >
-              {message.text}
-            </Text>
-          </View>
-        )}
 
         {/* Form Container */}
         <View style={styles.card}>
@@ -246,7 +206,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             // --- LOGIN FORM ---
             <View>
               <Text style={styles.formHeading}>Welcome Back</Text>
-              <Text style={styles.formSubheading}>Enter your credentials to access your portal</Text>
+              <Text style={styles.formSubheading}>Enter your credentials (API Authentication)</Text>
 
               <CustomInput
                 label="Employee ID"
@@ -266,7 +226,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               {loading ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color={color.primaryGold} />
-                  <Text style={styles.loadingText}>Authenticating employee...</Text>
+                  <Text style={styles.loadingText}>Authenticating with API (POST /api/login)...</Text>
                 </View>
               ) : (
                 <CustomButton
@@ -280,7 +240,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
             // --- REGISTER FORM ---
             <View>
               <Text style={styles.formHeading}>Create Account</Text>
-              <Text style={styles.formSubheading}>Register your employee profile</Text>
+              <Text style={styles.formSubheading}>Register profile (POST /api/register to CSV)</Text>
 
               <CustomInput
                 label="Employee ID"
@@ -321,7 +281,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               {loading ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color={color.primaryGold} />
-                  <Text style={styles.loadingText}>Posting new employee registration...</Text>
+                  <Text style={styles.loadingText}>Posting Registration (POST /api/register)...</Text>
                 </View>
               ) : (
                 <CustomButton
@@ -395,31 +355,6 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: color.primaryDarkGold,
-  },
-  messageBanner: {
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
-  },
-  errorMessage: {
-    backgroundColor: '#FEE2E2',
-    borderLeftWidth: 4,
-    borderLeftColor: color.accentRed,
-  },
-  errorMessageText: {
-    color: '#991B1B',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  successMessage: {
-    backgroundColor: '#D1FAE5',
-    borderLeftWidth: 4,
-    borderLeftColor: color.success,
-  },
-  successMessageText: {
-    color: '#065F46',
-    fontSize: 14,
-    fontWeight: '500',
   },
   card: {
     backgroundColor: '#FFFFFF',

@@ -6,7 +6,7 @@ const PORT = 3001;
 const CSV_FILE_PATH = path.join(__dirname, 'src', 'data', 'registered_users.csv');
 const LEAVES_FILE_PATH = path.join(__dirname, 'src', 'data', 'leave_requests.json');
 
-// Ensure data files exist
+// Ensure data files exist on disk
 const ensureFilesExist = () => {
   const dir = path.dirname(CSV_FILE_PATH);
   if (!fs.existsSync(dir)) {
@@ -38,7 +38,7 @@ const ensureFilesExist = () => {
 
 ensureFilesExist();
 
-// Helper to parse CSV lines into JSON objects
+// Parse CSV text from disk into JSON array
 const parseCSVToJSON = (csvText) => {
   if (!csvText) return [];
   const lines = csvText.split(/\r?\n/).filter((l) => l.trim().length > 0);
@@ -61,7 +61,7 @@ const parseCSVToJSON = (csvText) => {
   return result;
 };
 
-// Helper to convert JSON array to CSV string
+// Convert JSON array back into CSV string
 const parseJSONToCSV = (users) => {
   const headers = 'EmployeeID,FullName,Email,Password,Role,CreatedAt';
   const rows = users.map((u) => {
@@ -77,6 +77,7 @@ const parseJSONToCSV = (users) => {
 };
 
 const server = http.createServer((req, res) => {
+  // Set CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -87,75 +88,151 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // --- API 1: GET /api/employees ---
-  if (req.method === 'GET' && req.url === '/api/employees') {
-    setTimeout(() => {
-      try {
-        ensureFilesExist();
-        const csvData = fs.readFileSync(CSV_FILE_PATH, 'utf8');
-        const users = parseCSVToJSON(csvData);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, data: users }));
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: 'Failed to fetch employees' }));
-      }
-    }, 400); // 400ms simulated network latency for smooth loading spinner demonstration
-    return;
-  }
+  const url = req.url;
 
-  // --- API 2: POST /api/employees (Register New Employee) ---
-  if (req.method === 'POST' && req.url === '/api/employees') {
+  // --- API 1: POST /api/register ---
+  if (req.method === 'POST' && url === '/api/register') {
     let body = '';
     req.on('data', (chunk) => (body += chunk.toString()));
     req.on('end', () => {
       setTimeout(() => {
         try {
           const newUser = JSON.parse(body);
-          if (!newUser.employeeId || !newUser.fullName || !newUser.email) {
+          if (!newUser.employeeId || !newUser.fullName || !newUser.email || !newUser.password) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: 'Missing required employee fields' }));
+            res.end(JSON.stringify({ success: false, error: 'Missing required registration fields' }));
             return;
           }
 
           ensureFilesExist();
-          const csvData = fs.readFileSync(CSV_FILE_PATH, 'utf8');
-          const users = parseCSVToJSON(csvData);
+          const csvText = fs.readFileSync(CSV_FILE_PATH, 'utf8');
+          const users = parseCSVToJSON(csvText);
 
-          const existingIdx = users.findIndex(
-            (u) => u.employeeId.toUpperCase() === newUser.employeeId.toUpperCase()
-          );
-          if (existingIdx >= 0) {
-            users[existingIdx] = { ...users[existingIdx], ...newUser };
-          } else {
-            users.unshift({
-              ...newUser,
-              createdAt: newUser.createdAt || new Date().toISOString(),
-            });
+          const cleanId = newUser.employeeId.trim().toUpperCase();
+          const existing = users.find((u) => u.employeeId.toUpperCase() === cleanId);
+          if (existing) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: `Employee ID "${cleanId}" is already registered!` }));
+            return;
           }
 
-          const updatedCSV = parseJSONToCSV(users);
-          fs.writeFileSync(CSV_FILE_PATH, updatedCSV, 'utf8');
+          const userRecord = {
+            employeeId: cleanId,
+            fullName: newUser.fullName.trim(),
+            email: newUser.email.trim(),
+            password: newUser.password,
+            role: newUser.role || 'EMPLOYEE',
+            createdAt: new Date().toISOString(),
+          };
+
+          users.unshift(userRecord);
+          fs.writeFileSync(CSV_FILE_PATH, parseJSONToCSV(users), 'utf8');
 
           res.writeHead(201, { 'Content-Type': 'application/json' });
-          res.end(
-            JSON.stringify({
-              success: true,
-              message: 'Employee registered and saved to CSV',
-              data: newUser,
-            })
-          );
+          res.end(JSON.stringify({ success: true, message: 'Registration successful and saved to CSV', user: userRecord }));
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: 'Failed to register employee' }));
+          res.end(JSON.stringify({ success: false, error: 'Failed to process registration' }));
         }
-      }, 500);
+      }, 300);
     });
     return;
   }
 
-  // --- API 3: GET /api/leaves ---
-  if (req.method === 'GET' && req.url.startsWith('/api/leaves')) {
+  // --- API 2: POST /api/login ---
+  if (req.method === 'POST' && url === '/api/login') {
+    let body = '';
+    req.on('data', (chunk) => (body += chunk.toString()));
+    req.on('end', () => {
+      setTimeout(() => {
+        try {
+          const { employeeId, password } = JSON.parse(body);
+          if (!employeeId || !password) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Employee ID and Password are required' }));
+            return;
+          }
+
+          ensureFilesExist();
+          const csvText = fs.readFileSync(CSV_FILE_PATH, 'utf8');
+          const users = parseCSVToJSON(csvText);
+
+          const cleanId = employeeId.trim().toUpperCase();
+          const foundUser = users.find((u) => u.employeeId.toUpperCase() === cleanId);
+
+          if (!foundUser) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: `No account found for Employee ID "${cleanId}". Please register first.` }));
+            return;
+          }
+
+          if (foundUser.password !== password) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Incorrect password. Please try again.' }));
+            return;
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, message: 'Login successful', user: foundUser }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Failed to process login' }));
+        }
+      }, 300);
+    });
+    return;
+  }
+
+  // --- API 3: GET /api/employees ---
+  if (req.method === 'GET' && url === '/api/employees') {
+    setTimeout(() => {
+      try {
+        ensureFilesExist();
+        const csvText = fs.readFileSync(CSV_FILE_PATH, 'utf8');
+        const users = parseCSVToJSON(csvText);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, data: users }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Failed to fetch employees' }));
+      }
+    }, 300);
+    return;
+  }
+
+  // --- API 4: DELETE /api/employees (Delete User by Employee ID) ---
+  if (req.method === 'DELETE' && url.startsWith('/api/employees/')) {
+    const targetEmpId = url.replace('/api/employees/', '').trim().toUpperCase();
+    setTimeout(() => {
+      try {
+        ensureFilesExist();
+        const csvText = fs.readFileSync(CSV_FILE_PATH, 'utf8');
+        let users = parseCSVToJSON(csvText);
+
+        const initialCount = users.length;
+        users = users.filter((u) => u.employeeId.toUpperCase() !== targetEmpId);
+
+        if (users.length === initialCount) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: `Employee ID "${targetEmpId}" not found` }));
+          return;
+        }
+
+        fs.writeFileSync(CSV_FILE_PATH, parseJSONToCSV(users), 'utf8');
+        console.log(`[CSV Server] Deleted employee "${targetEmpId}" from registered_users.csv on disk!`);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, message: `Employee "${targetEmpId}" deleted from CSV` }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Failed to delete employee' }));
+      }
+    }, 300);
+    return;
+  }
+
+  // --- API 5: GET /api/leaves ---
+  if (req.method === 'GET' && url.startsWith('/api/leaves')) {
     setTimeout(() => {
       try {
         ensureFilesExist();
@@ -167,12 +244,12 @@ const server = http.createServer((req, res) => {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: 'Failed to fetch leaves' }));
       }
-    }, 400);
+    }, 300);
     return;
   }
 
-  // --- API 4: POST /api/leaves (Submit Leave Request) ---
-  if (req.method === 'POST' && req.url === '/api/leaves') {
+  // --- API 6: POST /api/leaves ---
+  if (req.method === 'POST' && url === '/api/leaves') {
     let body = '';
     req.on('data', (chunk) => (body += chunk.toString()));
     req.on('end', () => {
@@ -198,24 +275,18 @@ const server = http.createServer((req, res) => {
           fs.writeFileSync(LEAVES_FILE_PATH, JSON.stringify(leaves, null, 2), 'utf8');
 
           res.writeHead(201, { 'Content-Type': 'application/json' });
-          res.end(
-            JSON.stringify({
-              success: true,
-              message: 'Leave request submitted for approval',
-              data: newLeave,
-            })
-          );
+          res.end(JSON.stringify({ success: true, message: 'Leave request submitted', data: newLeave }));
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: 'Failed to submit leave request' }));
+          res.end(JSON.stringify({ success: false, error: 'Failed to submit leave' }));
         }
-      }, 500);
+      }, 300);
     });
     return;
   }
 
-  // Legacy GET / POST CSV endpoint
-  if (req.method === 'GET' && req.url === '/api/csv') {
+  // Legacy raw CSV endpoints
+  if (req.method === 'GET' && url === '/api/csv') {
     ensureFilesExist();
     const csvData = fs.readFileSync(CSV_FILE_PATH, 'utf8');
     res.writeHead(200, { 'Content-Type': 'text/csv' });
@@ -223,7 +294,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === 'POST' && req.url === '/api/csv') {
+  if (req.method === 'POST' && url === '/api/csv') {
     let body = '';
     req.on('data', (chunk) => (body += chunk.toString()));
     req.on('end', () => {
@@ -239,5 +310,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[Employee & Leave API Server] Running on http://localhost:${PORT}`);
+  console.log(`[Intellect REST API & CSV Sync Server] Running on http://localhost:${PORT}`);
 });

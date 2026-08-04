@@ -11,8 +11,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { CustomInput } from '../../components/common/CustomInput';
+import { SwalAlert, SwalType } from '../../components/common/SwalAlert';
 import { color } from '../../assets/colors/globalColor';
-import { storageService, RegisteredUser } from '../../services/storageService';
+import { RegisteredUser } from '../../services/storageService';
 import { databaseService } from '../../services/databaseService';
 import { authService } from '../../services/authService';
 
@@ -41,7 +42,24 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
   const [formPassword, setFormPassword] = useState('');
   const [formRole, setFormRole] = useState<'EMPLOYEE' | 'ADMIN'>('EMPLOYEE');
 
-  // GET API: Load all registered employees
+  // Swal Alert State
+  const [swalState, setSwalState] = useState<{
+    visible: boolean;
+    type: SwalType;
+    title: string;
+    text: string;
+  }>({
+    visible: false,
+    type: 'success',
+    title: '',
+    text: '',
+  });
+
+  const showSwal = (type: SwalType, title: string, text: string) => {
+    setSwalState({ visible: true, type, title, text });
+  };
+
+  // GET API: Load all registered employees via GET /api/employees
   const loadUsers = async () => {
     setLoading(true);
     const list = await authService.getEmployees();
@@ -83,15 +101,15 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
     setShowCSVModal(true);
   };
 
-  // POST API: Save/Register user
+  // POST API: Save/Register user via POST /api/register
   const handleSaveUser = async () => {
     if (!formEmpId.trim() || !formFullName.trim() || !formEmail.trim() || !formPassword.trim()) {
-      Alert.alert('Validation Error', 'Please fill in all user fields.');
+      showSwal('warning', 'Validation Error', 'Please fill in all user fields.');
       return;
     }
 
     if (formPassword.length < 6) {
-      Alert.alert('Validation Error', 'Password must be at least 6 characters.');
+      showSwal('warning', 'Validation Error', 'Password must be at least 6 characters.');
       return;
     }
 
@@ -108,35 +126,33 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
 
     try {
       if (isEditing) {
-        await storageService.updateUser(userData);
-        Alert.alert('Success', `User ${userData.employeeId} updated successfully.`);
+        await databaseService.updateUser(userData);
+        showSwal('success', 'User Updated!', `Employee "${userData.employeeId}" updated successfully.`);
       } else {
-        const existing = await storageService.getUserByEmployeeId(userData.employeeId);
-        if (existing) {
-          Alert.alert('Error', `Employee ID ${userData.employeeId} already exists!`);
+        const result = await authService.registerEmployee(userData);
+        if (!result.success) {
+          showSwal('error', 'Registration Error', result.error || 'Failed to add user.');
           setSubmitting(false);
           return;
         }
-
-        // Call POST API for registered employee
-        await authService.registerEmployee(userData);
-        Alert.alert('Success', `User ${userData.employeeId} registered and saved to CSV.`);
+        showSwal('success', 'Employee Created!', `Employee "${userData.employeeId}" added via POST API and saved to CSV.`);
       }
 
       setShowFormModal(false);
       resetForm();
       await loadUsers();
     } catch (err) {
-      Alert.alert('Error', 'Failed to save employee record.');
+      showSwal('error', 'Error', 'Failed to save employee record.');
     } finally {
       setSubmitting(false);
     }
   };
 
+  // DELETE API: Delete Employee via DELETE /api/employees/:id
   const handleDeleteUser = (empId: string) => {
     Alert.alert(
       'Confirm Delete',
-      `Are you sure you want to delete user ${empId}?`,
+      `Are you sure you want to permanently delete Employee "${empId}" from the API and CSV file?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -144,8 +160,13 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
           style: 'destructive',
           onPress: async () => {
             setLoading(true);
-            await storageService.deleteUser(empId);
+            const success = await authService.deleteEmployee(empId);
             await loadUsers();
+            if (success) {
+              showSwal('success', 'Employee Deleted!', `Employee "${empId}" removed from API and registered_users.csv.`);
+            } else {
+              showSwal('error', 'Delete Failed', `Could not delete Employee "${empId}".`);
+            }
           },
         },
       ]
@@ -192,7 +213,7 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
 
         <Text style={styles.countText}>
           Total Registered Users: <Text style={{ fontWeight: 'bold', color: color.primaryDarkGold }}>{users.length}</Text>
-          <Text style={{ fontStyle: 'italic', color: color.textSecondary }}> (Synced with src/data/registered_users.csv)</Text>
+          <Text style={{ fontStyle: 'italic', color: color.textSecondary }}> (Saved in src/data/registered_users.csv)</Text>
         </Text>
 
         {/* Users Table List with Loading Spinner */}
@@ -296,7 +317,6 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
               secureTextEntry
             />
 
-            {/* Role Picker */}
             <Text style={styles.rolePickerLabel}>Role</Text>
             <View style={styles.roleRow}>
               <TouchableOpacity
@@ -374,6 +394,15 @@ export default function AdminUsersPage({ onClose }: AdminUsersPageProps) {
           </View>
         </View>
       </Modal>
+
+      {/* --- SWAL ALERT MODAL --- */}
+      <SwalAlert
+        visible={swalState.visible}
+        type={swalState.type}
+        title={swalState.title}
+        text={swalState.text}
+        onConfirm={() => setSwalState((prev) => ({ ...prev, visible: false }))}
+      />
     </View>
   );
 }
@@ -390,7 +419,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justify.content: 'space-between',
     elevation: 3,
   },
   headerIcon: {
